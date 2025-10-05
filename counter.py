@@ -18,6 +18,7 @@ intents.message_content = True  # Required to read messages
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 user = None
+channelName = None
 
 
 def updateGrindDataframe(name, dataFrame, mention=0, post=0):
@@ -125,7 +126,7 @@ async def job_loop():
     if (weekday == 6):  # Sunday
         for guild in bot.guilds:
             for channel in guild.channels:
-                if 'grind-25' in channel.name:
+                if channelName in channel.name:
                     await handleChannel(channel, guild)
 
 
@@ -147,5 +148,8 @@ if __name__ == "__main__":
 
     global user
     user = tokenInfo['user']
+
+    global channelName
+    channelName = tokenInfo['channel']
 
     bot.run(tokenInfo['token'])
