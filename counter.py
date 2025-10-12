@@ -17,7 +17,7 @@ intents.message_content = True  # Required to read messages
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-user = None
+user = ""
 channelName = None
 
 
@@ -56,10 +56,36 @@ def communityNotes(message):
 
         if (reaction.emoji == "❌" and reaction.count >= largestCount):
             crossHighest = True
-        if largestCount > reaction.count:
+        if largestCount < reaction.count:
             largestCount = reaction.count
 
     return crossHighest
+
+
+def getGrinds(message, dataFrame, guild):
+    if communityNotes(message):
+        return dataFrame
+
+    member = guild.get_member(message.author.id)
+    if member.display_name is not None:
+        name = member.display_name
+    else:
+        name = message.author.name
+    mentions = set(message.mentions)
+    for mention in mentions:
+        memberMention = guild.get_member(mention.id)
+        if memberMention.display_name is not None:
+            mentionName = memberMention.display_name
+        else:
+            mentionName = mention.name
+        dataFrame = updateGrindDataframe(mentionName,
+                                         dataFrame,
+                                         mention=1)
+
+    dataFrame = updateGrindDataframe(name,
+                                     dataFrame,
+                                     post=1)
+    return dataFrame
 
 
 async def handleChannel(channel, guild):
@@ -69,58 +95,37 @@ async def handleChannel(channel, guild):
     '''
     now = datetime.datetime.utcnow()
     weekAgo = now - datetime.timedelta(days=7)
-    twoWeeksAgo = weekAgo - datetime.timedelta(days=14)
+    twoWeeksAgo = now - datetime.timedelta(days=14)
     messages = channel.history(after=weekAgo)
-    messagesTwoWeeksAgo = channel.history(before=weekAgo, after=twoWeeksAgo)
+    oldMessages = channel.history(after=twoWeeksAgo)
 
     grindTotals = DataFrame()
+    oldGrindTotals = DataFrame()
 
     # Find the messages from 2 weeks ago
-    messagesTwoWeek = 0
-    async for message in messagesTwoWeeksAgo:
-        messagesTwoWeek += 1
+    async for message in oldMessages:
+        oldGrindTotals = getGrinds(message, oldGrindTotals, guild)
 
-    # Find messages from last week
-    messagesWeek = 0
     async for message in messages:
-        messagesWeek += 1
-        if communityNotes(message):
-            continue
+        grindTotals = getGrinds(message, grindTotals, guild)
 
-        member = guild.get_member(message.author.id)
-        if member.display_name is not None:
-            name = member.display_name
-        else:
-            name = message.author.name
-        mentions = set(message.mentions)
-        for mention in mentions:
-            memberMention = guild.get_member(message.author.id)
-            if memberMention.display_name is not None:
-                mentionName = memberMention.displayName
-            else:
-                mentionName = mention.name
-            grindTotals = updateGrindDataframe(mentionName,
-                                               grindTotals,
-                                               mention=1)
-        grindTotals = updateGrindDataframe(name,
-                                           grindTotals,
-                                           post=1)
     grindTotals = grindTotals.sort_values('Total', ascending=False)
 
-    msg = (f"There were {messagesWeek} posted this week\n"
-           f"A change of {messagesWeek - messagesTwoWeek} from week before\n"
-           f"Top 10 posters\n"
+    totalWeekly = grindTotals['Total'].sum()
+    oldTotal = oldGrindTotals['Total'].sum()
+
+    msg = (f"There were {totalWeekly} posts and mentions this week\n"
+           f"A change of {oldTotal - totalWeekly} from week before\n"
+           f"Posters\n"
            f"```\n{grindTotals[grindTotals.columns[0]].to_markdown()}\n```")
 
-    if user is not None:
-        await channel.send(msg)
-        await user.send(msg)
+    # await channel.send(msg)
 
     print(msg)
 
 
 # creating a loop that runs every day at 3 PM UTC
-@tasks.loop(time=datetime.time(hour=15, minute=0))
+@tasks.loop(time=datetime.time(hour=9, minute=0))
 async def job_loop():
     weekday = datetime.datetime.utcnow().weekday()
     if (weekday == 6):  # Sunday
@@ -146,10 +151,8 @@ if __name__ == "__main__":
     with open('token.json') as f:
         tokenInfo = json.load(f)
 
-    global user
     user = tokenInfo['user']
 
-    global channelName
     channelName = tokenInfo['channel']
 
     bot.run(tokenInfo['token'])
