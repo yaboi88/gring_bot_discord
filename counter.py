@@ -97,7 +97,7 @@ async def handleChannel(channel, guild):
     weekAgo = now - datetime.timedelta(days=7)
     twoWeeksAgo = now - datetime.timedelta(days=14)
     messages = channel.history(after=weekAgo)
-    oldMessages = channel.history(after=twoWeeksAgo)
+    oldMessages = channel.history(before=weekAgo, after=twoWeeksAgo)
 
     grindTotals = DataFrame()
     oldGrindTotals = DataFrame()
@@ -115,7 +115,7 @@ async def handleChannel(channel, guild):
     oldTotal = oldGrindTotals['Total'].sum()
 
     msg = (f"There were {totalWeekly} posts and mentions this week\n"
-           f"A change of {oldTotal - totalWeekly} from week before\n"
+           f"A change of {totalWeekly-oldTotal} from week before\n"
            f"Posters\n"
            f"```\n{grindTotals[grindTotals.columns[0]].to_markdown()}\n```")
 
